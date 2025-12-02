@@ -80,6 +80,22 @@
     </style>
 </head>
   <body class="bg-slate-50 text-slate-800 antialiased overflow-hidden selection:bg-parami-100 selection:text-parami-dark">
-    <div id="root"></div>
+    <noscript>
+      <div style="padding: 20px; text-align: center;">
+        <h1>JavaScript Required</h1>
+        <p>Please enable JavaScript to use this application.</p>
+      </div>
+    </noscript>
+    <div id="root">
+      <div style="display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column; gap: 20px;">
+        <div style="width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top-color: #D7000F; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+        <p style="color: #64748b; font-family: sans-serif;">Loading Parami Pharmacy System...</p>
+      </div>
+    </div>
+    <style>
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
   </body>
 </html>
