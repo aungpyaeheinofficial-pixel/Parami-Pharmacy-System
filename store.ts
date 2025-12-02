@@ -1,3 +1,4 @@
+
 import { create } from 'zustand';
 import { 
   CartItem, Product, User, Role, Transaction, Customer, Branch, 
@@ -9,138 +10,14 @@ import {
 } from './data';
 
 // --- Shared Helper for Persistence ---
-const getInitialBranchId = () => {
+const getCurrentBranchId = () => {
   if (typeof window !== 'undefined') {
     return localStorage.getItem('currentBranchId') || 'b1';
   }
   return 'b1';
 };
 
-const initialBranchId = getInitialBranchId();
-
-// --- Branch Management Store ---
-interface BranchState {
-  branches: Branch[];
-  currentBranchId: string;
-  setBranch: (id: string) => void;
-  getCurrentBranch: () => Branch | undefined;
-  addBranch: (branch: Branch) => void;
-  updateBranch: (id: string, updates: Partial<Branch>) => void;
-  deleteBranch: (id: string) => void;
-}
-
-export const useBranchStore = create<BranchState>((set, get) => ({
-  branches: [
-    { 
-      id: 'b1', 
-      name: 'ပါရမီ(၁) ထားဝယ်', 
-      code: 'parami-1', 
-      address: 'No. 45, Arzarni Road, Dawei', 
-      phone: '09-420012345',
-      managerName: 'U Mg Mg',
-      email: 'branch1@parami.com',
-      status: 'active' 
-    }, 
-    { 
-      id: 'b2', 
-      name: 'ပါရမီ(၂) ရန်ကုန်', 
-      code: 'parami-2',
-      address: 'No. 12, Pyay Road, Yangon',
-      phone: '09-420098765', 
-      managerName: 'Daw Hla',
-      email: 'branch2@parami.com',
-      status: 'active'
-    } 
-  ],
-  currentBranchId: initialBranchId,
-  
-  setBranch: (id: string) => {
-    localStorage.setItem('currentBranchId', id);
-    set({ currentBranchId: id });
-    
-    // Trigger sync in other stores
-    useProductStore.getState().syncWithBranch(id);
-    useCustomerStore.getState().syncWithBranch(id);
-    useTransactionStore.getState().syncWithBranch(id);
-    useCartStore.getState().clearCart(); // Clear cart on branch switch
-    useDistributionStore.getState().syncWithBranch(id);
-    usePurchaseStore.getState().syncWithBranch(id);
-    useFinanceStore.getState().syncWithBranch(id);
-    useSupplierStore.getState().syncWithBranch(id);
-  },
-  
-  getCurrentBranch: () => get().branches.find(b => b.id === get().currentBranchId),
-
-  addBranch: (branch) => set((state) => ({ 
-    branches: [...state.branches, branch] 
-  })),
-
-  updateBranch: (id, updates) => set((state) => ({
-    branches: state.branches.map(b => b.id === id ? { ...b, ...updates } : b)
-  })),
-
-  deleteBranch: (id) => set((state) => {
-    const newBranches = state.branches.filter(b => b.id !== id);
-
-    // Cascade Delete Effect: Clean up data in other stores asynchronously
-    setTimeout(() => {
-        // Product Store
-        useProductStore.setState(s => ({
-            allProducts: s.allProducts.filter(p => p.branchId !== id),
-            products: s.products.filter(p => p.branchId !== id)
-        }));
-        // Customer Store
-        useCustomerStore.setState(s => ({
-            allCustomers: s.allCustomers.filter(c => c.branchId !== id),
-            customers: s.customers.filter(c => c.branchId !== id)
-        }));
-        // Transaction Store
-        useTransactionStore.setState(s => ({
-            allTransactions: s.allTransactions.filter(t => t.branchId !== id),
-            transactions: s.transactions.filter(t => t.branchId !== id)
-        }));
-        // Distribution Store
-        useDistributionStore.setState(s => ({
-             allOrders: s.allOrders.filter(o => o.branchId !== id),
-             orders: s.orders.filter(o => o.branchId !== id)
-        }));
-        // Purchase Store
-        usePurchaseStore.setState(s => ({
-             allPOs: s.allPOs.filter(p => p.branchId !== id),
-             purchaseOrders: s.purchaseOrders.filter(p => p.branchId !== id)
-        }));
-        // Finance Store
-        useFinanceStore.setState(s => ({
-             allExpenses: s.allExpenses.filter(e => e.branchId !== id),
-             expenses: s.expenses.filter(e => e.branchId !== id),
-             allPayables: s.allPayables.filter(p => p.branchId !== id),
-             payables: s.payables.filter(p => p.branchId !== id),
-             allReceivables: s.allReceivables.filter(r => r.branchId !== id),
-             receivables: s.receivables.filter(r => r.branchId !== id),
-        }));
-        // Supplier Store
-        useSupplierStore.setState(s => ({
-             allSuppliers: s.allSuppliers.filter(supplier => supplier.branchId !== id),
-             suppliers: s.suppliers.filter(supplier => supplier.branchId !== id)
-        }));
-    }, 0);
-    
-    // If we deleted the current branch, switch to the first available one
-    if (state.currentBranchId === id) {
-       const newId = newBranches.length > 0 ? newBranches[0].id : '';
-       localStorage.setItem('currentBranchId', newId);
-       
-       if (newId) {
-         // Trigger side effects asynchronously to avoid state conflict
-         setTimeout(() => {
-            useBranchStore.getState().setBranch(newId);
-         }, 0);
-       }
-       return { branches: newBranches, currentBranchId: newId };
-    }
-    return { branches: newBranches };
-  })
-}));
+const initialBranchId = getCurrentBranchId();
 
 // --- Auth Store ---
 interface AuthState {
@@ -223,6 +100,37 @@ export const useGlobalStore = create<GlobalState>((set) => ({
   toggleSidebar: () => set(state => ({ isSidebarOpen: !state.isSidebarOpen })),
 }));
 
+// --- Settings Store ---
+interface SettingsState {
+  settings: AppSettings;
+  updateSettings: (updates: Partial<AppSettings>) => void;
+}
+
+export const useSettingsStore = create<SettingsState>((set) => ({
+  settings: {
+    companyName: 'Parami Pharmacy',
+    taxId: '',
+    phone: '',
+    email: '',
+    address: '',
+    language: 'English',
+    shopNameReceipt: 'Parami Pharmacy',
+    receiptFooter: 'Thank you for shopping with us!',
+    paperSize: '80mm (Standard Thermal)',
+    defaultPrinter: 'System Default',
+    autoPrint: false,
+    showImages: true,
+    lowStockLimit: 10,
+    expiryWarningDays: 90,
+    enableEmailReports: false,
+    enableCriticalAlerts: false,
+    notificationEmail: ''
+  },
+  updateSettings: (updates) => set((state) => ({
+    settings: { ...state.settings, ...updates }
+  })),
+}));
+
 // --- Inventory / Product Management Store ---
 interface ProductState {
   allProducts: Product[]; // Master DB
@@ -247,7 +155,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
   setProducts: (products) => set({ products }),
   
   addProduct: (product) => {
-    const currentBranchId = useBranchStore.getState().currentBranchId;
+    const currentBranchId = getCurrentBranchId();
     const newProduct = { ...product, branchId: currentBranchId };
     set((state) => ({ 
       allProducts: [newProduct, ...state.allProducts],
@@ -257,7 +165,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
   
   updateProduct: (id, updates) => set((state) => {
     const updatedAll = state.allProducts.map((p) => (p.id === id ? { ...p, ...updates } : p));
-    const currentBranchId = useBranchStore.getState().currentBranchId;
+    const currentBranchId = getCurrentBranchId();
     return {
       allProducts: updatedAll,
       products: updatedAll.filter(p => p.branchId === currentBranchId)
@@ -266,7 +174,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
   
   deleteProduct: (id) => set((state) => {
      const updatedAll = state.allProducts.filter((p) => p.id !== id);
-     const currentBranchId = useBranchStore.getState().currentBranchId;
+     const currentBranchId = getCurrentBranchId();
      return {
         allProducts: updatedAll,
         products: updatedAll.filter(p => p.branchId === currentBranchId)
@@ -298,7 +206,7 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
   setCustomers: (customers) => set({ customers }),
   
   addCustomer: (customer) => {
-    const currentBranchId = useBranchStore.getState().currentBranchId;
+    const currentBranchId = getCurrentBranchId();
     const newCustomer = { ...customer, branchId: currentBranchId };
     set((state) => ({ 
       allCustomers: [newCustomer, ...state.allCustomers],
@@ -308,7 +216,7 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
   
   updateCustomer: (id, updates) => set((state) => {
     const updatedAll = state.allCustomers.map((c) => (c.id === id ? { ...c, ...updates } : c));
-    const currentBranchId = useBranchStore.getState().currentBranchId;
+    const currentBranchId = getCurrentBranchId();
     return {
       allCustomers: updatedAll,
       customers: updatedAll.filter(c => c.branchId === currentBranchId)
@@ -317,7 +225,7 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
   
   deleteCustomer: (id) => set((state) => {
     const updatedAll = state.allCustomers.filter((c) => c.id !== id);
-    const currentBranchId = useBranchStore.getState().currentBranchId;
+    const currentBranchId = getCurrentBranchId();
     return {
       allCustomers: updatedAll,
       customers: updatedAll.filter(c => c.branchId === currentBranchId)
@@ -346,7 +254,7 @@ export const useTransactionStore = create<TransactionState>((set, get) => ({
   },
 
   addTransaction: (transaction) => {
-     const currentBranchId = useBranchStore.getState().currentBranchId;
+     const currentBranchId = getCurrentBranchId();
      const newTrans = { ...transaction, branchId: currentBranchId };
      set((state) => ({ 
         allTransactions: [newTrans, ...state.allTransactions],
@@ -390,7 +298,7 @@ export const useDistributionStore = create<DistributionState>((set) => ({
   },
 
   addOrder: (order) => {
-    const currentBranchId = useBranchStore.getState().currentBranchId;
+    const currentBranchId = getCurrentBranchId();
     const newOrder = { ...order, branchId: currentBranchId };
     set(state => ({
       allOrders: [newOrder, ...state.allOrders],
@@ -400,7 +308,7 @@ export const useDistributionStore = create<DistributionState>((set) => ({
 
   updateOrder: (order) => set(state => {
     const updatedAll = state.allOrders.map(o => o.id === order.id ? order : o);
-    const currentBranchId = useBranchStore.getState().currentBranchId;
+    const currentBranchId = getCurrentBranchId();
     return {
       allOrders: updatedAll,
       orders: updatedAll.filter(o => o.branchId === currentBranchId)
@@ -409,7 +317,7 @@ export const useDistributionStore = create<DistributionState>((set) => ({
 
   deleteOrder: (id) => set(state => {
     const updatedAll = state.allOrders.filter(o => o.id !== id);
-    const currentBranchId = useBranchStore.getState().currentBranchId;
+    const currentBranchId = getCurrentBranchId();
     return {
       allOrders: updatedAll,
       orders: updatedAll.filter(o => o.branchId === currentBranchId)
@@ -438,7 +346,7 @@ export const usePurchaseStore = create<PurchaseState>((set) => ({
   },
 
   addPO: (po) => {
-    const currentBranchId = useBranchStore.getState().currentBranchId;
+    const currentBranchId = getCurrentBranchId();
     const newPO = { ...po, branchId: currentBranchId };
     set(state => ({
       allPOs: [newPO, ...state.allPOs],
@@ -448,7 +356,7 @@ export const usePurchaseStore = create<PurchaseState>((set) => ({
 
   updatePO: (po) => set(state => {
     const updatedAll = state.allPOs.map(p => p.id === po.id ? po : p);
-    const currentBranchId = useBranchStore.getState().currentBranchId;
+    const currentBranchId = getCurrentBranchId();
     return {
       allPOs: updatedAll,
       purchaseOrders: updatedAll.filter(p => p.branchId === currentBranchId)
@@ -457,7 +365,7 @@ export const usePurchaseStore = create<PurchaseState>((set) => ({
 
   deletePO: (id) => set(state => {
     const updatedAll = state.allPOs.filter(p => p.id !== id);
-    const currentBranchId = useBranchStore.getState().currentBranchId;
+    const currentBranchId = getCurrentBranchId();
     return {
       allPOs: updatedAll,
       purchaseOrders: updatedAll.filter(p => p.branchId === currentBranchId)
@@ -501,7 +409,7 @@ export const useFinanceStore = create<FinanceState>((set) => ({
   },
 
   addExpense: (ex) => {
-    const currentBranchId = useBranchStore.getState().currentBranchId;
+    const currentBranchId = getCurrentBranchId();
     const newEx = { ...ex, branchId: currentBranchId };
     set(state => ({
       allExpenses: [newEx, ...state.allExpenses],
@@ -511,7 +419,7 @@ export const useFinanceStore = create<FinanceState>((set) => ({
 
   removeExpense: (id) => set(state => {
     const updatedAll = state.allExpenses.filter(e => e.id !== id);
-    const currentBranchId = useBranchStore.getState().currentBranchId;
+    const currentBranchId = getCurrentBranchId();
     return {
       allExpenses: updatedAll,
       expenses: updatedAll.filter(e => e.branchId === currentBranchId)
@@ -520,7 +428,7 @@ export const useFinanceStore = create<FinanceState>((set) => ({
 
   markPayablePaid: (id) => set(state => {
     const updatedAll = state.allPayables.filter(p => p.id !== id);
-    const currentBranchId = useBranchStore.getState().currentBranchId;
+    const currentBranchId = getCurrentBranchId();
     return {
       allPayables: updatedAll,
       payables: updatedAll.filter(p => p.branchId === currentBranchId)
@@ -529,7 +437,7 @@ export const useFinanceStore = create<FinanceState>((set) => ({
 
   markReceivableCollected: (id) => set(state => {
      const updatedAll = state.allReceivables.filter(r => r.id !== id);
-     const currentBranchId = useBranchStore.getState().currentBranchId;
+     const currentBranchId = getCurrentBranchId();
      return {
        allReceivables: updatedAll,
        receivables: updatedAll.filter(r => r.branchId === currentBranchId)
@@ -558,7 +466,7 @@ export const useSupplierStore = create<SupplierState>((set) => ({
   },
 
   addSupplier: (supplier) => {
-    const currentBranchId = useBranchStore.getState().currentBranchId;
+    const currentBranchId = getCurrentBranchId();
     const newSupplier = { ...supplier, branchId: currentBranchId };
     set(state => ({
       allSuppliers: [...state.allSuppliers, newSupplier],
@@ -568,7 +476,7 @@ export const useSupplierStore = create<SupplierState>((set) => ({
 
   updateSupplier: (id, updates) => set(state => {
     const updatedAll = state.allSuppliers.map(s => s.id === id ? { ...s, ...updates } : s);
-    const currentBranchId = useBranchStore.getState().currentBranchId;
+    const currentBranchId = getCurrentBranchId();
     return {
       allSuppliers: updatedAll,
       suppliers: updatedAll.filter(s => s.branchId === currentBranchId)
@@ -577,7 +485,7 @@ export const useSupplierStore = create<SupplierState>((set) => ({
 
   deleteSupplier: (id) => set(state => {
     const updatedAll = state.allSuppliers.filter(s => s.id !== id);
-    const currentBranchId = useBranchStore.getState().currentBranchId;
+    const currentBranchId = getCurrentBranchId();
     return {
       allSuppliers: updatedAll,
       suppliers: updatedAll.filter(s => s.branchId === currentBranchId)
@@ -585,33 +493,128 @@ export const useSupplierStore = create<SupplierState>((set) => ({
   })
 }));
 
-// --- Settings Store ---
-interface SettingsState {
-  settings: AppSettings;
-  updateSettings: (updates: Partial<AppSettings>) => void;
+// --- Branch Management Store ---
+// Defined LAST to avoid circular dependency issues when it calls syncWithBranch on other stores
+interface BranchState {
+  branches: Branch[];
+  currentBranchId: string;
+  setBranch: (id: string) => void;
+  getCurrentBranch: () => Branch | undefined;
+  addBranch: (branch: Branch) => void;
+  updateBranch: (id: string, updates: Partial<Branch>) => void;
+  deleteBranch: (id: string) => void;
 }
 
-export const useSettingsStore = create<SettingsState>((set) => ({
-  settings: {
-    companyName: 'Parami Pharmacy',
-    taxId: '',
-    phone: '',
-    email: '',
-    address: '',
-    language: 'English',
-    shopNameReceipt: 'Parami Pharmacy',
-    receiptFooter: 'Thank you for shopping with us!',
-    paperSize: '80mm (Standard Thermal)',
-    defaultPrinter: 'System Default',
-    autoPrint: false,
-    showImages: true,
-    lowStockLimit: 10,
-    expiryWarningDays: 90,
-    enableEmailReports: false,
-    enableCriticalAlerts: false,
-    notificationEmail: ''
+export const useBranchStore = create<BranchState>((set, get) => ({
+  branches: [
+    { 
+      id: 'b1', 
+      name: 'ပါရမီ(၁) ထားဝယ်', 
+      code: 'parami-1', 
+      address: 'No. 45, Arzarni Road, Dawei', 
+      phone: '09-420012345',
+      managerName: 'U Mg Mg',
+      email: 'branch1@parami.com',
+      status: 'active' 
+    }, 
+    { 
+      id: 'b2', 
+      name: 'ပါရမီ(၂) ရန်ကုန်', 
+      code: 'parami-2',
+      address: 'No. 12, Pyay Road, Yangon',
+      phone: '09-420098765', 
+      managerName: 'Daw Hla',
+      email: 'branch2@parami.com',
+      status: 'active'
+    } 
+  ],
+  currentBranchId: initialBranchId,
+  
+  setBranch: (id: string) => {
+    localStorage.setItem('currentBranchId', id);
+    set({ currentBranchId: id });
+    
+    // Trigger sync in other stores
+    useProductStore.getState().syncWithBranch(id);
+    useCustomerStore.getState().syncWithBranch(id);
+    useTransactionStore.getState().syncWithBranch(id);
+    useCartStore.getState().clearCart(); // Clear cart on branch switch
+    useDistributionStore.getState().syncWithBranch(id);
+    usePurchaseStore.getState().syncWithBranch(id);
+    useFinanceStore.getState().syncWithBranch(id);
+    useSupplierStore.getState().syncWithBranch(id);
   },
-  updateSettings: (updates) => set((state) => ({
-    settings: { ...state.settings, ...updates }
+  
+  getCurrentBranch: () => get().branches.find(b => b.id === get().currentBranchId),
+
+  addBranch: (branch) => set((state) => ({ 
+    branches: [...state.branches, branch] 
   })),
+
+  updateBranch: (id, updates) => set((state) => ({
+    branches: state.branches.map(b => b.id === id ? { ...b, ...updates } : b)
+  })),
+
+  deleteBranch: (id) => set((state) => {
+    const newBranches = state.branches.filter(b => b.id !== id);
+
+    // Cascade Delete Effect: Clean up data in other stores asynchronously
+    // Since useBranchStore is defined last, it can safely reference these stores
+    setTimeout(() => {
+        // Product Store
+        useProductStore.setState(s => ({
+            allProducts: s.allProducts.filter(p => p.branchId !== id),
+            products: s.products.filter(p => p.branchId !== id)
+        }));
+        // Customer Store
+        useCustomerStore.setState(s => ({
+            allCustomers: s.allCustomers.filter(c => c.branchId !== id),
+            customers: s.customers.filter(c => c.branchId !== id)
+        }));
+        // Transaction Store
+        useTransactionStore.setState(s => ({
+            allTransactions: s.allTransactions.filter(t => t.branchId !== id),
+            transactions: s.transactions.filter(t => t.branchId !== id)
+        }));
+        // Distribution Store
+        useDistributionStore.setState(s => ({
+             allOrders: s.allOrders.filter(o => o.branchId !== id),
+             orders: s.orders.filter(o => o.branchId !== id)
+        }));
+        // Purchase Store
+        usePurchaseStore.setState(s => ({
+             allPOs: s.allPOs.filter(p => p.branchId !== id),
+             purchaseOrders: s.purchaseOrders.filter(p => p.branchId !== id)
+        }));
+        // Finance Store
+        useFinanceStore.setState(s => ({
+             allExpenses: s.allExpenses.filter(e => e.branchId !== id),
+             expenses: s.expenses.filter(e => e.branchId !== id),
+             allPayables: s.allPayables.filter(p => p.branchId !== id),
+             payables: s.payables.filter(p => p.branchId !== id),
+             allReceivables: s.allReceivables.filter(r => r.branchId !== id),
+             receivables: s.receivables.filter(r => r.branchId !== id),
+        }));
+        // Supplier Store
+        useSupplierStore.setState(s => ({
+             allSuppliers: s.allSuppliers.filter(supplier => supplier.branchId !== id),
+             suppliers: s.suppliers.filter(supplier => supplier.branchId !== id)
+        }));
+    }, 0);
+    
+    // If we deleted the current branch, switch to the first available one
+    if (state.currentBranchId === id) {
+       const newId = newBranches.length > 0 ? newBranches[0].id : '';
+       localStorage.setItem('currentBranchId', newId);
+       
+       if (newId) {
+         // Trigger side effects asynchronously to avoid state conflict
+         setTimeout(() => {
+            get().setBranch(newId);
+         }, 0);
+       }
+       return { branches: newBranches, currentBranchId: newId };
+    }
+    return { branches: newBranches };
+  })
 }));
