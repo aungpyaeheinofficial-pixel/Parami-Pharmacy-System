@@ -27,6 +27,8 @@ export default defineConfig(({ mode }) => {
         outDir: 'dist',
         assetsDir: 'assets',
         sourcemap: false,
+        minify: 'esbuild',
+        cssCodeSplit: true,
         rollupOptions: {
           output: {
             manualChunks: {
@@ -35,6 +37,9 @@ export default defineConfig(({ mode }) => {
             }
           }
         }
+      },
+      optimizeDeps: {
+        include: ['react', 'react-dom', 'react-router-dom', 'zustand', 'lucide-react', 'recharts']
       }
     };
 });
